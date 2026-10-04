@@ -5,7 +5,10 @@
     "autoload": {
         "psr-4": {
             "Spark\\Fire\\": "src/"
-        }
+        },
+        "files": [
+            "src/helpers.php"
+        ]
     },
     "require": {
         "php": "^8.2",

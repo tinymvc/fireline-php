@@ -8,10 +8,10 @@ The official PHP adapter for the FireLine Alpine.js plugin, designed for TinyMVC
 composer require tinymvc/fireline-php
 ```
 
-Register the service provider in your TinyMVC application (e.g., `config/app.php`):
+Register the service provider in your TinyMVC application (e.g., `bootstrap/providers.php`):
 
 ```php
-'providers' => [
+[
     // ...
     \Spark\Fire\FireServiceProvider::class,
 ],
@@ -32,6 +32,25 @@ This adapter bridges TinyMVC with the FireLine JS client. It detects FireLine AJ
 | `error` | `error(string $message, int $status = 400): Response` | Error JSON response |
 | `handleValidation` | `handleValidation(string $message, array $errors, int $status = 422): Response` | Validation error response |
 | `isJs` | `isJs(): bool` | Detects if current request is a FireLine AJAX request |
+
+## Global Helpers
+
+For convenience, the package provides global helper functions that wrap the `Fire` facade:
+
+- **`fire(string $component = null, array $props = [])`**
+  If a component is provided, it returns a `Response` (equivalent to `Fire::render($component, $props)`).
+  If called without arguments, it returns the underlying `FireService` instance so you can chain methods:
+  ```php
+  // Render a view
+  return fire('dashboard/index', ['user' => $user]);
+
+  // Chain other methods
+  return fire()->navigate('/settings');
+  return fire()->success('Done!');
+  ```
+
+- **`is_fire_js(): bool`**
+  Returns `true` if the current request is a FireLine AJAX request (equivalent to `Fire::isJs()`).
 
 ## Controller Examples
 
@@ -87,9 +106,13 @@ public function destroy(int $id): Response
 You can apply the `FireMiddleware` to ensure standard `no-cache` and `Vary: X-FireLine` headers are appended correctly to all FireLine responses:
 
 ```php
-use Spark\Fire\FireMiddleware;
+// bootstrap/app.php
 
-// Add to your route or global middleware stack
+->withMiddleware(
+    load: __DIR__ . '/middlewares.php',
+    queue: ['csrf', Spark\Fire\FireMiddleware::class]
+)
+
 ```
 
 ## Router Macro
