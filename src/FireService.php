@@ -25,26 +25,61 @@ class FireService
                 'html' => $engine->render($template, $props),
                 'title' => $engine->yieldSection('title'),
             ])
-                ->withHeaders(['Vary' => 'X-Fire', 'X-Fire' => 'true'])
+                ->withHeaders(['Vary' => 'X-FireLine', 'X-FireLine' => '1'])
                 ->noCache();
-
         }
 
         return view($template, $props)
-            ->withHeaders(['Vary' => 'X-Fire']);
+            ->withHeaders(['Vary' => 'X-FireLine']);
     }
 
     public function redirect(string $url, int $status = 302): Response
     {
+        if ($this->isJs()) {
+            return json(['redirect' => $url], 200)
+                ->withHeaders(['Vary' => 'X-FireLine', 'X-FireLine' => '1'])
+                ->noCache();
+        }
+
+        return redirect($url, $status);
     }
 
     public function navigate(string $url, int $status = 302): Response
     {
+        if ($this->isJs()) {
+            return json(['navigate' => $url], 200)
+                ->withHeaders(['Vary' => 'X-FireLine', 'X-FireLine' => '1'])
+                ->noCache();
+        }
+
+        return redirect($url, $status);
+    }
+
+    public function success(string $message = '', array $data = []): Response
+    {
+        return json(array_filter([
+            'status' => 'success',
+            'message' => $message ?: null,
+            'data' => $data ?: null,
+        ]))->withHeaders(['Vary' => 'X-FireLine', 'X-FireLine' => '1'])->noCache();
+    }
+
+    public function error(string $message, int $status = 400): Response
+    {
+        return json(['status' => 'error', 'message' => $message], $status)
+            ->withHeaders(['Vary' => 'X-FireLine', 'X-FireLine' => '1'])->noCache();
+    }
+
+    public function handleValidation(string $message, array $errors, int $status = 422): Response
+    {
+        return json(['message' => $message, 'errors' => $errors], $status)
+            ->withHeaders(['Vary' => 'X-FireLine', 'X-FireLine' => '1'])
+            ->noCache();
     }
 
     public function isJs(): bool
     {
         return $this->request->expectsJson() &&
-            in_array((string) $this->request->header('X-Fire', ''), ['true', '1', 'yes', 'on'], true);
+            in_array((string) $this->request->header('X-FireLine', ''), ['true', '1', 'yes', 'on'], true);
     }
 }
