@@ -66,6 +66,16 @@ class FireService
         return in_array(strtolower(trim((string) $this->request->header('X-FireLine', ''))), ['true', '1', 'yes', 'on'], true);
     }
 
+    public function isPreload(): bool
+    {
+        return in_array(strtolower(trim((string) $this->request->header('X-FireLine-Preload', ''))), ['true', '1', 'yes', 'on'], true);
+    }
+
+    public function isPartial(): bool
+    {
+        return in_array(strtolower(trim((string) $this->request->header('X-FireLine-Partial', ''))), ['true', '1', 'yes', 'on'], true);
+    }
+
     private function envelope(array $data, int $status = 200): Response
     {
         return FireHeaders::apply(

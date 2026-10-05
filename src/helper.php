@@ -34,3 +34,23 @@ function is_fire_js(): bool
 {
     return Fire::isJs();
 }
+
+/**
+ * Helper function to check if the current request is a Fire.js prefetch/preload request.
+ *
+ * @return bool Returns true if the current request is a preload request, false otherwise.
+ */
+function is_fire_preload(): bool
+{
+    return Fire::isPreload();
+}
+
+/**
+ * Helper function to check if the current request is a Fire.js partial load request.
+ *
+ * @return bool Returns true if the current request is a partial request, false otherwise.
+ */
+function is_fire_partial(): bool
+{
+    return Fire::isPartial();
+}

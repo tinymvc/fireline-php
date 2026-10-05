@@ -35,7 +35,8 @@ final class FireAdapterTest extends ApplicationTestCase
         Route::get('/raw', fn() => 'raw response');
         Route::get('/array', fn() => ['message' => 'raw array']);
         Route::get('/early', function () {
-            (new Response('early response'))->send(); });
+            (new Response('early response'))->send();
+        });
         return $app;
     }
 
@@ -43,8 +44,12 @@ final class FireAdapterTest extends ApplicationTestCase
     {
         $this->assertTrue(function_exists('fire'));
         $this->assertTrue(function_exists('is_fire_js'));
+        $this->assertTrue(function_exists('is_fire_preload'));
+        $this->assertTrue(function_exists('is_fire_partial'));
         $this->assertInstanceOf(FireService::class, fire());
         $this->assertFalse(is_fire_js());
+        $this->assertFalse(is_fire_preload());
+        $this->assertFalse(is_fire_partial());
         (new TestResponse(fire('page', ['message' => 'Helper render'])))
             ->assertOk()->assertSee('<h1>Helper render</h1>');
     }
@@ -80,6 +85,17 @@ final class FireAdapterTest extends ApplicationTestCase
         $this->get('/about')->assertSee('<!doctype html>');
         $this->get('/about', ['X-FireLine' => ' YES '])->assertJsonPath('title', 'Adapter page');
         $this->get('/about')->assertSee('<!doctype html>')->assertHeaderMissing('X-FireLine');
+    }
+
+    public function testServiceDetectsAdvancedHeaders(): void
+    {
+        $this->get('/about', ['X-FireLine-Preload' => '1', 'X-FireLine-Partial' => '0']);
+        $this->assertTrue(Fire::isPreload());
+        $this->assertFalse(Fire::isPartial());
+
+        $this->get('/about', ['X-FireLine-Preload' => '0', 'X-FireLine-Partial' => '1']);
+        $this->assertFalse(Fire::isPreload());
+        $this->assertTrue(Fire::isPartial());
     }
 
     public function testNativeRedirectStatusAndDestination(): void

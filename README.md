@@ -76,6 +76,23 @@ And `layouts/app.blade.php`:
 </html>
 ```
 
+### Advanced Optimization
+
+FireLine's advanced directives (`x-preload` and `$partial`) transmit special headers so you can bypass expensive operations or layout compilation:
+
+```php
+// In a controller, skip heavy queries if just preloading
+if (!is_fire_preload()) {
+    Event::fire('page_viewed', ['page' => '/about']);
+}
+
+// Or skip wrapping components if it's a partial load
+if (is_fire_partial()) {
+    // Return just the fragment, no layout
+    return view('components/comments', ['data' => $data]);
+}
+```
+
 The default JS target is `#app > div`. The returned fragment replaces that element and must continue to match the configured selector. Escape user-provided content with Blade's `{{ ... }}`. The fragment title comes from `@section('title')`; pass an explicit third argument when needed:
 
 ```php
@@ -95,8 +112,10 @@ return Fire::render('pages/about', ['message' => 'About us'], title: 'About');
 | `error(string $message, int $status = 400): Response` | Always JSON: `{status: 'error', message}` |
 | `handleValidation(string $message, array $errors, int $status = 422): Response` | Always JSON: `{message, errors}` |
 | `isJs(): bool` | Whether this is a FireLine request |
+| `isPreload(): bool` | Whether this is a FireLine `x-preload` request |
+| `isPartial(): bool` | Whether this is a FireLine `$partial` load request |
 
-`is_fire_js()` is the helper equivalent of `Fire::isJs()`. Each resolution uses the current request, including in applications that handle several requests in one process. Each response is a fresh instance, preventing status or redirect headers from leaking between calls.
+`is_fire_js()`, `is_fire_preload()`, and `is_fire_partial()` are the helper equivalents. Each resolution uses the current request, including in applications that handle several requests in one process. Each response is a fresh instance, preventing status or redirect headers from leaking between calls.
 
 Use HTTP 422 for client field-validation handling. String field messages are converted to arrays; even an empty error bag encodes as a JSON object. The JS client keeps additional success payloads in `envelope.raw.data`; it does not copy them into form state.
 

@@ -18,6 +18,8 @@ use Spark\Http\Response;
  * @method static Response error(string $message, int $status = 400)
  * @method static Response handleValidation(string $message, array $errors, int $status = 422)
  * @method static bool isJs()
+ * @method static bool isPreload()
+ * @method static bool isPartial()
  */
 class Fire extends Facade
 {
