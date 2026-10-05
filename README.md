@@ -168,6 +168,16 @@ return fire()->navigate('/dashboard');
 
 FireLine serializes the form's fields; it does not generate CSRF tokens. Include Spark's `@csrf` hidden field, or set `FireLine.settings.csrfToken` to your server-provided token to send `X-CSRF-TOKEN`. Keep Spark's CSRF middleware enabled for writes. For method overrides, use the framework's hidden `_method` field in a POST form.
 
+### Asset Versioning
+
+If you are using FireLine's `assetVersion` feature on the frontend to force hard reloads when assets change, you can set the version backend-side using the `version()` method anywhere before sending the response:
+
+```php
+Fire::version('v2.1')->render('pages/about');
+// Or globally in a middleware:
+fire()->version(config('app.asset_version'));
+```
+
 Adapter responses merge `X-FireLine` into `Vary`. Existing values such as `Accept-Encoding` and `Vary: *` are preserved. FireLine responses also get `X-FireLine: 1` and `no-store, no-cache` headers. Ordinary renders and redirects vary on `X-FireLine` so caches do not mix HTML with JSON.
 
 The middleware applies this policy to explicit responses and registers Spark response preparation for normalized string/array returns, handled errors and early sends. It does not automatically convert arbitrary HTML into FireLine envelopes; use `Fire::render()` for page routes.

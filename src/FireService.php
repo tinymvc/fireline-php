@@ -8,8 +8,17 @@ use function in_array;
 
 class FireService
 {
+    /** @var string|null The asset version to be used for the FireLine. */
+    private ?string $assetVersion = null;
+
     public function __construct(private readonly Request $request)
     {
+    }
+
+    public function version(string $version): self
+    {
+        $this->assetVersion = $version;
+        return $this;
     }
 
     public function render(string $template, array $props = [], ?string $title = null): Response
@@ -86,6 +95,11 @@ class FireService
 
     private function resp(mixed $content = '', int $statusCode = 200, array $headers = []): Response
     {
-        return new Response($content, $statusCode, $headers);
+        $response = new Response($content, $statusCode, $headers);
+        if ($this->assetVersion !== null) {
+            $response->setHeader('X-FireLine-Asset-Version', $this->assetVersion);
+        }
+
+        return $response;
     }
 }
