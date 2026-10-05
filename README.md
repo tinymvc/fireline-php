@@ -1,130 +1,177 @@
-# Fireline PHP
+# FireLine PHP
 
-The official PHP adapter for the FireLine Alpine.js plugin, designed for TinyMVC/Spark.
+TinyMVC/Spark adapter for FireLine JS 2. Requires PHP 8.2+ and `tinymvc/tinycore` 4.0.7+ within 4.x.
 
-## Installation
+## Install and register
 
-```bash
+```sh
 composer require tinymvc/fireline-php
 ```
 
-Register the service provider in your TinyMVC application (e.g., `bootstrap/providers.php`):
+Add the provider to `bootstrap/providers.php`:
 
 ```php
-[
-    // ...
+return [
+    // Other providers...
     \Spark\Fire\FireServiceProvider::class,
-],
+];
 ```
 
-## What it does
-
-This adapter bridges TinyMVC with the FireLine JS client. It detects FireLine AJAX requests via the `X-FireLine` header and intelligently returns JSON envelopes (for DOM morphing, validation, redirects, etc.) instead of standard HTML pages or HTTP redirects.
-
-## `Fire` Facade API Reference
-
-| Method | Signature | Description |
-|---|---|---|
-| `render` | `render(string $template, array $props = []): Response` | Renders a view; returns HTML or JSON based on request type |
-| `redirect` | `redirect(string $url, int $status = 302): Response` | Hard redirect or JSON redirect for FireLine |
-| `navigate` | `navigate(string $url, int $status = 302): Response` | SPA navigate (pushState without page reload) |
-| `success` | `success(string $message = '', array $data = []): Response` | Success JSON response |
-| `error` | `error(string $message, int $status = 400): Response` | Error JSON response |
-| `handleValidation` | `handleValidation(string $message, array $errors, int $status = 422): Response` | Validation error response |
-| `isJs` | `isJs(): bool` | Detects if current request is a FireLine AJAX request |
-
-## Global Helpers
-
-For convenience, the package provides global helper functions that wrap the `Fire` facade:
-
-- **`fire(string $component = null, array $props = [])`**
-  If a component is provided, it returns a `Response` (equivalent to `Fire::render($component, $props)`).
-  If called without arguments, it returns the underlying `FireService` instance so you can chain methods:
-  ```php
-  // Render a view
-  return fire('dashboard/index', ['user' => $user]);
-
-  // Chain other methods
-  return fire()->navigate('/settings');
-  return fire()->success('Done!');
-  ```
-
-- **`is_fire_js(): bool`**
-  Returns `true` if the current request is a FireLine AJAX request (equivalent to `Fire::isJs()`).
-
-## Controller Examples
-
-### Standard Page Render
+Add the middleware to your application's queue, before the routes/middleware whose responses it should handle:
 
 ```php
-use Spark\Fire\Fire;
-
-public function index(): Response
-{
-    return Fire::render('dashboard/index', ['user' => auth()->user()]);
-}
-```
-
-### Form Submission with Validation
-
-```php
-use Spark\Fire\Fire;
-use Spark\Http\Request;
-
-public function store(Request $request): Response
-{
-    // TinyCore throws ValidationException automatically on failure,
-    // which should be converted to Fire::handleValidation(...) if mapped globally.
-    // Or you can validate manually:
-    
-    if ($someCondition) {
-        return Fire::handleValidation('Please fix the errors.', [
-            'email' => ['This email is already taken.'],
-        ]);
-    }
-
-    // Process submission...
-
-    return Fire::success('Account created!');
-}
-```
-
-### Navigation After Action
-
-```php
-use Spark\Fire\Fire;
-
-public function destroy(int $id): Response
-{
-    Post::findOrFail($id)->remove();
-    return Fire::navigate('/posts');
-}
-```
-
-## Middleware
-
-You can apply the `FireMiddleware` to ensure standard `no-cache` and `Vary: X-FireLine` headers are appended correctly to all FireLine responses:
-
-```php
-// bootstrap/app.php
-
 ->withMiddleware(
     load: __DIR__ . '/middlewares.php',
-    queue: ['csrf', Spark\Fire\FireMiddleware::class]
+    queue: [\Spark\Fire\FireMiddleware::class, 'csrf'],
 )
-
 ```
 
-## Router Macro
+Install and register the [FireLine JS plugin](https://github.com/shahinmoyshan/fireline#readme) separately. Its request header is `X-FireLine: 1`. Detection accepts `1`, `true`, `yes`, or `on` case-insensitively, with surrounding whitespace ignored; it does not require a second Accept-header check. This header selects a representation, not authorization.
 
-The service provider automatically registers a `fire` macro on the Router for simple view rendering:
+## Render a full page or a fragment
+
+```php
+use Spark\Fire\Fire;
+
+return Fire::render('pages/about', ['message' => 'About us']);
+// Equivalent:
+return fire('pages/about', ['message' => 'About us']);
+```
+
+Ordinary requests receive HTML. FireLine requests receive JSON containing `html` and `title`. **The adapter renders the template you provide; it does not extract a fragment from a full HTML document.** Arrange the template to return a full layout on an ordinary request and one root element on a FireLine request.
+
+For example, `pages/about.blade.php`:
+
+```blade
+@if (!is_fire_js())
+    @extends('layouts/app')
+@endif
+
+@section('title')About us@endsection
+
+@section('content')
+<div>
+    <h1>{{ $message }}</h1>
+    <a x-navigate href="/">Home</a>
+</div>
+@endsection
+
+@if (is_fire_js())
+    @yield('content')
+@endif
+```
+
+And `layouts/app.blade.php`:
+
+```blade
+<!doctype html>
+<html>
+<head>
+    <title>@yield('title')</title>
+    <!-- Load your Alpine + FireLine assets here. -->
+</head>
+<body>
+    <div id="app">@yield('content')</div>
+</body>
+</html>
+```
+
+The default JS target is `#app > div`. The returned fragment replaces that element and must continue to match the configured selector. Escape user-provided content with Blade's `{{ ... }}`. The fragment title comes from `@section('title')`; pass an explicit third argument when needed:
+
+```php
+return Fire::render('pages/about', ['message' => 'About us'], title: 'About');
+```
+
+## API
+
+`Fire` is `Spark\Fire\Fire`. Calling `fire()` without a template resolves the current `FireService`.
+
+| Method | Result |
+| --- | --- |
+| `render(string $template, array $props = [], ?string $title = null): Response` | HTML or a JSON render envelope |
+| `redirect(string $url, int $status = 302): Response` | Native HTTP redirect, or `{redirect: url}` for full browser navigation |
+| `navigate(string $url, int $status = 302): Response` | Native HTTP redirect, or `{navigate: url}` for FireLine navigation |
+| `success(string $message = '', array $data = []): Response` | Always JSON: `{status: 'success', message, data}` |
+| `error(string $message, int $status = 400): Response` | Always JSON: `{status: 'error', message}` |
+| `handleValidation(string $message, array $errors, int $status = 422): Response` | Always JSON: `{message, errors}` |
+| `isJs(): bool` | Whether this is a FireLine request |
+
+`is_fire_js()` is the helper equivalent of `Fire::isJs()`. Each resolution uses the current request, including in applications that handle several requests in one process. Each response is a fresh instance, preventing status or redirect headers from leaking between calls.
+
+Use HTTP 422 for client field-validation handling. String field messages are converted to arrays; even an empty error bag encodes as a JSON object. The JS client keeps additional success payloads in `envelope.raw.data`; it does not copy them into form state.
+
+For FireLine `navigate`/`redirect`, the envelope uses HTTP 200; `$status` applies only to the native HTTP redirect. Return trusted HTTP(S) destinations. Native fallbacks for success/errors/validation remain JSON; implement an application-specific post/redirect/get flow if those forms must also work without JavaScript.
+
+## Routes
+
+The provider registers a GET-only `fire` macro:
 
 ```php
 use Spark\Facades\Route;
 
-Route::fire('/about', 'pages/about');
+Route::fire('/about', 'pages/about', ['message' => 'About us'])
+    ->name('about');
 ```
 
-## CSRF Protection
+It returns Spark's real route object, so route naming and middleware chaining work. This macro comes from the adapter; it is not a core Spark 4 route helper.
 
-When using `interceptForms: true` in JS, TinyMVC's `CsrfProtection` middleware reads the `_token` field from FormData or the `X-CSRF-TOKEN` header. FireLine sends CSRF via FormData by default on form submissions, but for JSON-body fetch requests, configure `settings.csrfToken` in your JS setup to send the token.
+## Forms and validation
+
+```blade
+<form x-data="{ form: $form() }" x-form action="/register" method="post">
+    @csrf
+    <input name="email" type="email">
+    <p x-text="form.firstError('email')"></p>
+    <p x-text="form.message"></p>
+    <button :disabled="form.processing">Register</button>
+</form>
+```
+
+A controller can return validation explicitly:
+
+```php
+return Fire::handleValidation('Please fix the errors.', [
+    'email' => ['This email is already taken.'],
+]);
+```
+
+`FireMiddleware` also catches Spark's `ValidationException` from downstream handlers and converts it to the same HTTP 422 envelope for FireLine requests. Ordinary requests rethrow it for the framework's normal handling. Validation thrown outside the middleware's scope needs the application's normal exception mapping.
+
+After saving:
+
+```php
+return fire()->success('Account created!', ['id' => $user->id]);
+// Or fetch and display a new page:
+return fire()->navigate('/dashboard');
+```
+
+## CSRF and cache behavior
+
+FireLine serializes the form's fields; it does not generate CSRF tokens. Include Spark's `@csrf` hidden field, or set `FireLine.settings.csrfToken` to your server-provided token to send `X-CSRF-TOKEN`. Keep Spark's CSRF middleware enabled for writes. For method overrides, use the framework's hidden `_method` field in a POST form.
+
+Adapter responses merge `X-FireLine` into `Vary`. Existing values such as `Accept-Encoding` and `Vary: *` are preserved. FireLine responses also get `X-FireLine: 1` and `no-store, no-cache` headers. Ordinary renders and redirects vary on `X-FireLine` so caches do not mix HTML with JSON.
+
+The middleware applies this policy to explicit responses and registers Spark response preparation for normalized string/array returns, handled errors and early sends. It does not automatically convert arbitrary HTML into FireLine envelopes; use `Fire::render()` for page routes.
+
+## Development
+
+```sh
+composer install
+composer validate --strict
+composer test
+composer test -- --testsuite Unit
+composer test -- --testsuite Feature
+composer test -- --filter Validation
+composer test -- --list-tests
+```
+
+The PHP suite uses TinyCore’s built-in `Spark\Testing\Runner`, `TestCase`, `ApplicationTestCase` and `TestResponse`; no custom assertion runner or extra test dependency is required. Unit tests live in `tests/Unit`, and feature tests in `tests/Feature`. Each feature test gets an isolated application and temporary storage, cleaned up by the framework. The tests exercise helper loading, both render representations, titles, redirects, sequential requests, validation, cache headers, and actual HTTP dispatch through the provider, router and middleware (including normalized and early responses). The sibling JS repository also provides a real browser/PHP test:
+
+```sh
+cd ../fireline-js
+npm ci
+npx playwright install chromium
+npm run test:integration
+```
+
+An installed Chrome can be used with `FIRELINE_BROWSER_CHANNEL=chrome npm run test:integration`. The PHP fixture server is for tests only, listens on loopback, and uses port 18994 by default (`FIRELINE_PHP_PORT` overrides it).

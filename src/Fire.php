@@ -11,7 +11,7 @@ use Spark\Http\Response;
  * This facade provides a static interface to the FireService, allowing you 
  * to call its methods without needing to instantiate the service directly. 
  *
- * @method static Response render(string $template, array $props = [])
+ * @method static Response render(string $template, array $props = [], ?string $title = null)
  * @method static Response redirect(string $url, int $status = 302)
  * @method static Response navigate(string $url, int $status = 302)
  * @method static Response success(string $message = '', array $data = [])

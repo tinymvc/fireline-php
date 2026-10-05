@@ -7,11 +7,14 @@
             "Spark\\Fire\\": "src/"
         },
         "files": [
-            "src/helpers.php"
+            "src/helper.php"
         ]
     },
     "require": {
         "php": "^8.2",
-        "tinymvc/tinycore": "^4.0"
+        "tinymvc/tinycore": "^4.0.7"
+    },
+    "scripts": {
+        "test": "@php tests/run.php"
     }
 }
