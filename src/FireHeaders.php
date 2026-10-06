@@ -8,7 +8,7 @@ use function in_array;
 /** Cache separation for the HTML and JSON representations of a route. */
 final class FireHeaders
 {
-    public static function apply(Response $response, bool $isFire): Response
+    public static function apply(Response $response, bool $isFire, ?string $assetVersion = null): Response
     {
         $varyHeaders = [];
         $values = [];
@@ -20,11 +20,12 @@ final class FireHeaders
             }
         }
 
-        if (
-            !in_array('*', $values, true) &&
-            !in_array('x-fireline', array_map('strtolower', $values), true)
-        ) {
-            $values[] = 'X-FireLine';
+        if (!in_array('*', $values, true)) {
+            foreach (['X-FireLine', 'X-FireLine-Preload', 'X-FireLine-Partial'] as $header) {
+                if (!in_array(strtolower($header), array_map('strtolower', $values), true)) {
+                    $values[] = $header;
+                }
+            }
         }
 
         $vary = in_array('*', $values, true) ? '*'
@@ -32,6 +33,10 @@ final class FireHeaders
 
         foreach ($varyHeaders ?: ['Vary'] as $name) {
             $response->setHeader($name, $vary);
+        }
+
+        if ($assetVersion !== null) {
+            $response->setHeader('X-FireLine-Asset-Version', $assetVersion);
         }
 
         if ($isFire) {

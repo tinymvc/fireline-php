@@ -18,6 +18,9 @@ if (isset($assets[$path])) {
 
 $app = testApp();
 $response = (new FireMiddleware())->handle(app(Request::class), function () use ($path) {
+    Fire::version('fixture-2.1');
+    if ($path === '/partial')
+        return Fire::render('partial', ['message' => Fire::isPartial() ? 'Partial via JSON' : 'Page']);
     if ($path === '/submit') {
         if (($_POST['email'] ?? '') !== 'valid@example.test') {
             throw ValidationException::withMessages(['email' => ['Enter a valid email.']]);

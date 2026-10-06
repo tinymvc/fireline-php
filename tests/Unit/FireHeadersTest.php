@@ -15,7 +15,7 @@ final class FireHeadersTest extends TestCase
         FireHeaders::apply($response, true);
 
         (new TestResponse($response))
-            ->assertHeader('Vary', 'Accept-Encoding, X-FireLine')
+            ->assertHeader('Vary', 'Accept-Encoding, X-FireLine, X-FireLine-Preload, X-FireLine-Partial')
             ->assertHeader('X-FireLine', '1');
         $this->assertArrayNotHasKey('Vary', $response->getHeaders());
         $this->assertStringContainsString('no-store', $response->getHeaders()['Cache-Control']);
@@ -31,7 +31,7 @@ final class FireHeadersTest extends TestCase
     {
         $response = FireHeaders::apply(new Response('ok'), false);
         (new TestResponse($response))
-            ->assertHeader('Vary', 'X-FireLine')
+            ->assertHeader('Vary', 'X-FireLine, X-FireLine-Preload, X-FireLine-Partial')
             ->assertHeaderMissing('X-FireLine')
             ->assertHeaderMissing('Cache-Control');
     }

@@ -8,8 +8,8 @@ use function in_array;
 
 class FireService
 {
-    /** @var string|null The asset version to be used for the FireLine. */
-    private ?string $assetVersion = null;
+    /** Versions follow the request, without retaining completed worker requests. */
+    private static ?\WeakMap $versions = null;
 
     public function __construct(private readonly Request $request)
     {
@@ -17,8 +17,17 @@ class FireService
 
     public function version(string $version): self
     {
-        $this->assetVersion = $version;
+        if ($version === '' || preg_match('/[\x00-\x1F\x7F]/', $version)) {
+            throw new \InvalidArgumentException('Asset version must be a nonempty HTTP header value.');
+        }
+        self::$versions ??= new \WeakMap();
+        self::$versions[$this->request] = $version;
         return $this;
+    }
+
+    public function assetVersion(): ?string
+    {
+        return self::$versions[$this->request] ?? null;
     }
 
     public function render(string $template, array $props = [], ?string $title = null): Response
@@ -29,7 +38,7 @@ class FireService
         if ($this->isJs()) {
             return $this->envelope([
                 'html' => $html,
-                'title' => ($title ?? trim($engine->yieldSection('title', ''))) ?: null,
+                'title' => $title ?? (($section = trim($engine->yieldSection('title', ''))) === '' ? null : $section),
             ]);
         }
 
@@ -77,12 +86,12 @@ class FireService
 
     public function isPreload(): bool
     {
-        return in_array(strtolower(trim((string) $this->request->header('X-FireLine-Preload', ''))), ['true', '1', 'yes', 'on'], true);
+        return $this->isJs() && in_array(strtolower(trim((string) $this->request->header('X-FireLine-Preload', ''))), ['true', '1', 'yes', 'on'], true);
     }
 
     public function isPartial(): bool
     {
-        return in_array(strtolower(trim((string) $this->request->header('X-FireLine-Partial', ''))), ['true', '1', 'yes', 'on'], true);
+        return $this->isJs() && in_array(strtolower(trim((string) $this->request->header('X-FireLine-Partial', ''))), ['true', '1', 'yes', 'on'], true);
     }
 
     private function envelope(array $data, int $status = 200): Response
@@ -96,8 +105,8 @@ class FireService
     private function resp(mixed $content = '', int $statusCode = 200, array $headers = []): Response
     {
         $response = new Response($content, $statusCode, $headers);
-        if ($this->assetVersion !== null) {
-            $response->setHeader('X-FireLine-Asset-Version', $this->assetVersion);
+        if (($version = $this->assetVersion()) !== null) {
+            $response->setHeader('X-FireLine-Asset-Version', $version);
         }
 
         return $response;

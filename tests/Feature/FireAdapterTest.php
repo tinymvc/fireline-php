@@ -59,7 +59,7 @@ final class FireAdapterTest extends ApplicationTestCase
         $this->get('/about')->assertOk()
             ->assertSee('<!doctype html>')
             ->assertSee('<h1>&lt;Hello&gt;</h1>')
-            ->assertHeader('Vary', 'X-FireLine')
+            ->assertHeader('Vary', 'X-FireLine, X-FireLine-Preload, X-FireLine-Partial')
             ->assertHeaderMissing('X-FireLine');
     }
 
@@ -67,7 +67,7 @@ final class FireAdapterTest extends ApplicationTestCase
     {
         $response = $this->getJson('/about', ['X-FireLine' => '1'])
             ->assertOk()->assertJsonPath('title', 'Adapter page')
-            ->assertHeader('X-FireLine', '1')->assertHeader('Vary', 'X-FireLine');
+            ->assertHeader('X-FireLine', '1')->assertHeader('Vary', 'X-FireLine, X-FireLine-Preload, X-FireLine-Partial');
         $this->assertStringStartsWith('<div ', trim($response->json('html')));
         $this->assertStringNotContainsString('<html>', $response->json('html'));
         $this->assertStringContainsString('&lt;Hello&gt;', $response->json('html'));
@@ -89,18 +89,18 @@ final class FireAdapterTest extends ApplicationTestCase
 
     public function testServiceDetectsAdvancedHeaders(): void
     {
-        $this->get('/about', ['X-FireLine-Preload' => '1', 'X-FireLine-Partial' => '0']);
+        $this->get('/about', ['X-FireLine' => '1', 'X-FireLine-Preload' => '1', 'X-FireLine-Partial' => '0']);
         $this->assertTrue(Fire::isPreload());
         $this->assertFalse(Fire::isPartial());
 
-        $this->get('/about', ['X-FireLine-Preload' => '0', 'X-FireLine-Partial' => '1']);
+        $this->get('/about', ['X-FireLine' => '1', 'X-FireLine-Preload' => '0', 'X-FireLine-Partial' => '1']);
         $this->assertFalse(Fire::isPreload());
         $this->assertTrue(Fire::isPartial());
     }
 
     public function testNativeRedirectStatusAndDestination(): void
     {
-        $this->get('/navigate')->assertRedirect('/next', 303)->assertHeader('Vary', 'X-FireLine');
+        $this->get('/navigate')->assertRedirect('/next', 303)->assertHeader('Vary', 'X-FireLine, X-FireLine-Preload, X-FireLine-Partial');
         $this->get('/redirect')->assertRedirect('/login', 307);
     }
 
@@ -159,4 +159,64 @@ final class FireAdapterTest extends ApplicationTestCase
         // Spark treats an unmatched HTTP method as a route-not-found response.
         $this->postJson('/about')->assertNotFound();
     }
+    public function testVersionSurvivesFacadeResolutionsButNotTheNextRequest(): void
+    {
+        Route::get('/versioned', function () {
+            fire()->version('build-42');
+            return Fire::render('page', ['message' => 'Versioned']);
+        });
+        $this->get('/versioned')->assertHeader('X-FireLine-Asset-Version', 'build-42');
+        $this->getJson('/versioned', ['X-FireLine' => '1'])
+            ->assertHeader('X-FireLine-Asset-Version', 'build-42')->assertJsonPath('title', 'Adapter page');
+        $this->get('/about')->assertHeaderMissing('X-FireLine-Asset-Version');
+    }
+
+    public function testVersionAppliesToNormalizedEarlyAndValidationResponses(): void
+    {
+        Route::get('/versioned-raw', function () {
+            Fire::version('0');
+            return 'raw';
+        });
+        Route::get('/versioned-early', function () {
+            Fire::version('early');
+            (new Response('early'))->send();
+        });
+        Route::post('/versioned-validation', function () {
+            Fire::version('validation');
+            throw ValidationException::withMessages(['email' => 'Invalid']);
+        });
+        $this->get('/versioned-raw')->assertHeader('X-FireLine-Asset-Version', '0');
+        $this->get('/versioned-early')->assertHeader('X-FireLine-Asset-Version', 'early');
+        $this->postJson('/versioned-validation', [], ['X-FireLine' => '1'])
+            ->assertUnprocessable()->assertHeader('X-FireLine-Asset-Version', 'validation');
+    }
+
+    public function testAdvancedHeadersRequireFireLineAndAcceptBooleanValues(): void
+    {
+        foreach (['1', 'true', ' YES ', 'on'] as $value) {
+            $this->get('/about', ['X-FireLine' => $value, 'X-FireLine-Preload' => $value, 'X-FireLine-Partial' => $value]);
+            $this->assertTrue(is_fire_preload());
+            $this->assertTrue(is_fire_partial());
+        }
+        foreach (['', '0', 'false', 'anything'] as $value) {
+            $this->get('/about', ['X-FireLine' => $value, 'X-FireLine-Preload' => '1', 'X-FireLine-Partial' => '1']);
+            $this->assertFalse(is_fire_preload());
+            $this->assertFalse(is_fire_partial());
+        }
+    }
+
+    public function testExplicitFalseyTitlesArePreserved(): void
+    {
+        Route::get('/empty-title', fn() => Fire::render('page', ['message' => 'Hello'], ''));
+        Route::get('/zero-title', fn() => Fire::render('page', ['message' => 'Hello'], '0'));
+        $this->getJson('/empty-title', ['X-FireLine' => '1'])->assertJsonPath('title', '');
+        $this->getJson('/zero-title', ['X-FireLine' => '1'])->assertJsonPath('title', '0');
+    }
+
+    public function testRejectsInvalidAssetVersion(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        fire()->version("build\r\nInjected: header");
+    }
+
 }

@@ -1,6 +1,6 @@
 # FireLine PHP
 
-TinyMVC/Spark adapter for FireLine JS 2. Requires PHP 8.2+ and `tinymvc/tinycore` 4.0.7+ within 4.x.
+TinyMVC/Spark adapter for FireLine JS 2.1. Requires PHP 8.2+ and `tinymvc/tinycore` 4.0.7+ within 4.x.
 
 ## Install and register
 
@@ -76,22 +76,25 @@ And `layouts/app.blade.php`:
 </html>
 ```
 
-### Advanced Optimization
+### Preload and partial requests
 
-FireLine's advanced directives (`x-preload` and `$partial`) transmit special headers so you can bypass expensive operations or layout compilation:
+`x-preload` sends `X-FireLine-Preload: 1`; `$partial` sends `X-FireLine-Partial: 1`. Both require `X-FireLine` to be enabled. They use the same accepted boolean values as `isJs()`.
 
 ```php
-// In a controller, skip heavy queries if just preloading
+// Required data and markup must be identical for preload and navigation.
+// Optional page-view analytics can be omitted for speculative requests.
 if (!is_fire_preload()) {
     Event::fire('page_viewed', ['page' => '/about']);
 }
 
 // Or skip wrapping components if it's a partial load
 if (is_fire_partial()) {
-    // Return just the fragment, no layout
-    return view('components/comments', ['data' => $data]);
+    // Return a JSON render envelope containing the fragment.
+    return Fire::render('components/comments', ['data' => $data]);
 }
 ```
+
+Partials retain their host and reconcile its children; return the content to place inside it. Partial fragments may have multiple roots or be empty. Do not return raw HTML to `$partial`.
 
 The default JS target is `#app > div`. The returned fragment replaces that element and must continue to match the configured selector. Escape user-provided content with Blade's `{{ ... }}`. The fragment title comes from `@section('title')`; pass an explicit third argument when needed:
 
@@ -114,6 +117,8 @@ return Fire::render('pages/about', ['message' => 'About us'], title: 'About');
 | `isJs(): bool` | Whether this is a FireLine request |
 | `isPreload(): bool` | Whether this is a FireLine `x-preload` request |
 | `isPartial(): bool` | Whether this is a FireLine `$partial` load request |
+| `version(string $version): self` | Set the asset version for the current request |
+| `assetVersion(): ?string` | Read the current request’s explicit version |
 
 `is_fire_js()`, `is_fire_preload()`, and `is_fire_partial()` are the helper equivalents. Each resolution uses the current request, including in applications that handle several requests in one process. Each response is a fresh instance, preventing status or redirect headers from leaking between calls.
 
@@ -173,12 +178,19 @@ FireLine serializes the form's fields; it does not generate CSRF tokens. Include
 If you are using FireLine's `assetVersion` feature on the frontend to force hard reloads when assets change, you can set the version backend-side using the `version()` method anywhere before sending the response:
 
 ```php
-Fire::version('v2.1')->render('pages/about');
-// Or globally in a middleware:
-fire()->version(config('app.asset_version'));
+return Fire::version('build-2026-10-06')->render('pages/about');
+// Or in an application middleware, after FireMiddleware:
+if (($version = config('app.asset_version')) !== null) {
+    fire()->version((string) $version);
+}
+return $next($request);
 ```
 
-Adapter responses merge `X-FireLine` into `Vary`. Existing values such as `Accept-Encoding` and `Vary: *` are preserved. FireLine responses also get `X-FireLine: 1` and `no-store, no-cache` headers. Ordinary renders and redirects vary on `X-FireLine` so caches do not mix HTML with JSON.
+A version set through `fire()->version()` is shared by later facade/service resolutions in that request, including normalized and early responses handled by the middleware. It is not retained for later requests in a worker. Empty values and HTTP control characters are rejected. The configuration key above is an application convention; the adapter does not read it automatically.
+
+Embed the same build identifier in the initial page's `FireLine.settings.assetVersion` using your framework's safe JSON encoding. A preload never causes a reload on its own. On a mismatch, the JS client makes a full navigation to the requested page; partial loads reload the current document.
+
+Adapter responses merge `X-FireLine`, `X-FireLine-Preload` and `X-FireLine-Partial` into `Vary`. Existing values such as `Accept-Encoding` and `Vary: *` are preserved. FireLine responses also get `X-FireLine: 1` and `no-store, no-cache` headers. Ordinary renders and redirects use the same Vary fields so caches separate HTML, JSON and partial representations.
 
 The middleware applies this policy to explicit responses and registers Spark response preparation for normalized string/array returns, handled errors and early sends. It does not automatically convert arbitrary HTML into FireLine envelopes; use `Fire::render()` for page routes.
 
@@ -194,7 +206,7 @@ composer test -- --filter Validation
 composer test -- --list-tests
 ```
 
-The PHP suite uses TinyCore’s built-in `Spark\Testing\Runner`, `TestCase`, `ApplicationTestCase` and `TestResponse`; no custom assertion runner or extra test dependency is required. Unit tests live in `tests/Unit`, and feature tests in `tests/Feature`. Each feature test gets an isolated application and temporary storage, cleaned up by the framework. The tests exercise helper loading, both render representations, titles, redirects, sequential requests, validation, cache headers, and actual HTTP dispatch through the provider, router and middleware (including normalized and early responses). The sibling JS repository also provides a real browser/PHP test:
+The PHP suite uses TinyCore’s built-in `Spark\Testing\Runner`, `TestCase`, `ApplicationTestCase` and `TestResponse`; no custom assertion runner or extra test dependency is required. Unit tests live in `tests/Unit`, and feature tests in `tests/Feature`. Each feature test gets an isolated application and temporary storage, cleaned up by the framework. The tests exercise helper loading, both render representations, titles (including empty and zero), redirects, sequential requests, asset-version isolation, advanced request headers, validation, cache headers, and actual HTTP dispatch through the provider, router and middleware (including normalized and early responses). The sibling JS repository also provides a real browser/PHP test:
 
 ```sh
 cd ../fireline-js

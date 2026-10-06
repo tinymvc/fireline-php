@@ -20,6 +20,7 @@ use Spark\Http\Response;
  * @method static bool isJs()
  * @method static bool isPreload()
  * @method static bool isPartial()
+ * @method static ?string assetVersion()
  * @method static FireService version(string $version)
  */
 class Fire extends Facade
