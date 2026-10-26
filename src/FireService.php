@@ -2,7 +2,7 @@
 
 namespace Spark\Fire;
 
-use Spark\Http\{Request, Response};
+use Spark\Http\{Header, Request, Response};
 use Spark\View\Blade;
 use function in_array;
 
@@ -81,17 +81,17 @@ class FireService
 
     public function isJs(): bool
     {
-        return in_array(strtolower(trim((string) $this->request->header('X-FireLine', ''))), ['true', '1', 'yes', 'on'], true);
+        return in_array(strtolower(trim((string) $this->request->header(Header::X_FIRELINE, ''))), ['true', '1', 'yes', 'on'], true);
     }
 
     public function isPreload(): bool
     {
-        return $this->isJs() && in_array(strtolower(trim((string) $this->request->header('X-FireLine-Preload', ''))), ['true', '1', 'yes', 'on'], true);
+        return $this->isJs() && in_array(strtolower(trim((string) $this->request->header(Header::X_FIRELINE_PRELOAD, ''))), ['true', '1', 'yes', 'on'], true);
     }
 
     public function isPartial(): bool
     {
-        return $this->isJs() && in_array(strtolower(trim((string) $this->request->header('X-FireLine-Partial', ''))), ['true', '1', 'yes', 'on'], true);
+        return $this->isJs() && in_array(strtolower(trim((string) $this->request->header(Header::X_FIRELINE_PARTIAL, ''))), ['true', '1', 'yes', 'on'], true);
     }
 
     private function envelope(array $data, int $status = 200): Response
@@ -106,7 +106,7 @@ class FireService
     {
         $response = new Response($content, $statusCode, $headers);
         if (($version = $this->assetVersion()) !== null) {
-            $response->setHeader('X-FireLine-Asset-Version', $version);
+            $response->setHeader(Header::X_FIRELINE_ASSET_VERSION, $version);
         }
 
         return $response;

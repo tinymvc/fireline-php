@@ -54,3 +54,23 @@ function is_fire_partial(): bool
 {
     return Fire::isPartial();
 }
+
+/**
+ * Helper function to generate a unique key based on the provided data.
+ *
+ * @param mixed $data The data to generate the key from. If null, uses the current microtime.
+ * @param bool $unique Whether to append the current microtime to the data for uniqueness.
+ * 
+ * @return string Returns an MD5 hash of the provided data or the current microtime.
+ */
+function fire_xkey(mixed $data = null, bool $unique = false): string
+{
+    $data ??= uniqid('x_fire', true);
+    $data = is_string($data) ? $data : serialize($data);
+
+    if ($unique) {
+        $data .= microtime(true);
+    }
+
+    return md5($data);
+}

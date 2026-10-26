@@ -2,6 +2,7 @@
 
 namespace Spark\Fire;
 
+use Spark\Http\Header;
 use Spark\Http\Response;
 use function in_array;
 
@@ -21,7 +22,7 @@ final class FireHeaders
         }
 
         if (!in_array('*', $values, true)) {
-            foreach (['X-FireLine', 'X-FireLine-Preload', 'X-FireLine-Partial'] as $header) {
+            foreach ([Header::X_FIRELINE, Header::X_FIRELINE_PRELOAD, Header::X_FIRELINE_PARTIAL] as $header) {
                 if (!in_array(strtolower($header), array_map('strtolower', $values), true)) {
                     $values[] = $header;
                 }
@@ -36,11 +37,11 @@ final class FireHeaders
         }
 
         if ($assetVersion !== null) {
-            $response->setHeader('X-FireLine-Asset-Version', $assetVersion);
+            $response->setHeader(Header::X_FIRELINE_ASSET_VERSION, $assetVersion);
         }
 
         if ($isFire) {
-            $response->noCache()->setHeader('X-FireLine', '1');
+            $response->noCache()->setHeader(Header::X_FIRELINE, '1');
         }
 
         return $response;

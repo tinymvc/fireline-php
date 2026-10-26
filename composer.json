@@ -1,6 +1,6 @@
 {
     "name": "tinymvc/fireline-php",
-    "description": "The PHP (Tinymvc/Spark) adapter for the Fireline Alpine.js plugin v2.",
+    "description": "Fireline PHP (tinymvc/spark) adapter for Fireline Js",
     "license": "MIT",
     "autoload": {
         "psr-4": {
@@ -8,6 +8,16 @@
         },
         "files": [
             "src/helper.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
+    "archive": {
+        "exclude": [
+            "/tests"
         ]
     },
     "require": {
