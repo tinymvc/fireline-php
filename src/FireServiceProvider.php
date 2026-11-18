@@ -19,4 +19,11 @@ class FireServiceProvider extends ServiceProvider
                 fn(string $path, string $component, array $props = []) => new Route($path, method: 'GET', callback: fn() => Fire::render($component, $props))
             );
     }
+
+    public function boot(): void
+    {
+        // Queue the FireMiddleware to be executed for every request.
+        $this->app->get(\Spark\Http\Middleware::class)
+            ->queue(\Spark\Fire\FireMiddleware::class);
+    }
 }

@@ -26,5 +26,12 @@
     },
     "scripts": {
         "test": "@php tests/run.php"
+    },
+    "extra": {
+        "spark": {
+            "providers": [
+                "Spark\\Fire\\FireServiceProvider"
+            ]
+        }
     }
 }

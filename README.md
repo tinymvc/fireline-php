@@ -8,24 +8,6 @@ TinyMVC/Spark adapter for FireLine JS 2.1. Requires PHP 8.2+ and `tinymvc/tinyco
 composer require tinymvc/fireline-php
 ```
 
-Add the provider to `bootstrap/providers.php`:
-
-```php
-return [
-    // Other providers...
-    \Spark\Fire\FireServiceProvider::class,
-];
-```
-
-Add the middleware to your application's queue, before the routes/middleware whose responses it should handle:
-
-```php
-->withMiddleware(
-    load: __DIR__ . '/middlewares.php',
-    queue: [\Spark\Fire\FireMiddleware::class, 'csrf'],
-)
-```
-
 Install and register the [FireLine JS plugin](https://github.com/shahinmoyshan/fireline#readme) separately. Its request header is `X-FireLine: 1`. Detection accepts `1`, `true`, `yes`, or `on` case-insensitively, with surrounding whitespace ignored; it does not require a second Accept-header check. This header selects a representation, not authorization.
 
 ## Render a full page or a fragment
