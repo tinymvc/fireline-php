@@ -61,7 +61,7 @@ final class ComponentEndpointTest extends ApplicationTestCase
         $html = Fire::component(TestCounterComponent::class, ['count' => 10, 'message' => 'Mounted']);
 
         $this->assertStringContainsString('data-fire-id=', $html);
-        $this->assertStringContainsString('x-data="fireComponent(', $html);
+        $this->assertStringContainsString('x-data="reactive(', $html);
         $this->assertStringContainsString('data-fire-content', $html);
         $this->assertStringContainsString('Count: 10, Message: Mounted', $html);
     }

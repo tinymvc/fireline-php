@@ -64,7 +64,7 @@ class FireService
         $safeId = htmlspecialchars($id, ENT_QUOTES, 'UTF-8');
 
         return sprintf(
-            '<div id="%s" data-fire-id="%s" x-data="fireComponent(%s)"><div data-fire-content>%s</div></div>',
+            '<div id="%s" data-fire-id="%s" x-data="reactive(%s)"><div data-fire-content>%s</div></div>',
             $safeId,
             $safeId,
             $payload,
