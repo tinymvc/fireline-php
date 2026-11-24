@@ -90,6 +90,7 @@ return Fire::render('pages/about', ['message' => 'About us'], title: 'About');
 
 | Method | Result |
 | --- | --- |
+| `component(string $class, array $props = []): string` | Mount a reactive component and return its HTML wrapper |
 | `render(string $template, array $props = [], ?string $title = null): Response` | HTML or a JSON render envelope |
 | `redirect(string $url, int $status = 302): Response` | Native HTTP redirect, or `{redirect: url}` for full browser navigation |
 | `navigate(string $url, int $status = 302): Response` | Native HTTP redirect, or `{navigate: url}` for FireLine navigation |
@@ -151,9 +152,113 @@ return fire()->success('Account created!', ['id' => $user->id]);
 return fire()->navigate('/dashboard');
 ```
 
+## Reactive components
+
+Create a component and its Blade view from the application directory:
+
+```sh
+php spark make:fire Counter
+php spark make:fire Admin/UserProfile
+```
+
+The generator writes `app/Components/Counter.php` and `resources/views/components/counter.blade.php`. Namespaced names create matching subdirectories. Existing files are not overwritten.
+
+A component declares initialized public state and public action methods:
+
+```php
+namespace App\Components;
+
+use Spark\Fire\Component;
+
+class Counter extends Component
+{
+    public int $count = 0;
+    public string $label = 'Counter';
+
+    protected function view(): string
+    {
+        return 'components.counter';
+    }
+
+    public function increment(int $by = 1): void
+    {
+        $this->count += $by;
+    }
+
+    public function saveLabel(): void
+    {
+        $this->validate(['label' => 'required|min:3']);
+        $this->dispatch('label-saved', $this->label);
+    }
+}
+```
+
+In `resources/views/components/counter.blade.php`:
+
+```blade
+<div>
+    <h2>{{ $label }}: {{ $count }}</h2>
+    <input fire:model="label">
+    <p>{{ $errors->first('label') }}</p>
+    <button type="button" fire:click="increment(2)">Add two</button>
+    <form fire:submit="saveLabel">
+        <button fire:loading.attr="disabled" fire:target="saveLabel">Save</button>
+        <span fire:loading fire:target="saveLabel">Saving…</span>
+    </form>
+</div>
+```
+
+Mount it in a page:
+
+```blade
+@reactive(\App\Components\Counter::class, ['count' => 3])
+```
+
+The PHP equivalents are `Fire::component(Counter::class, ['count' => 3])` and `fire_component(Counter::class, ['count' => 3])`. They return HTML strings, while `Fire::render()` returns a page response. The wrapper owns its Alpine scope and stable content host; do not add another `x-data` to it.
+
+The template returned by a protected `view(): string` receives public state, `$component`, and the component-local `$errors` bag. Alternatively, override `render(): string|Blade`. Return trusted HTML fragments; escape user values with Blade's `{{ ... }}`. Components may return several child elements or an empty fragment because the adapter supplies the stable host.
+
+### State and lifecycle
+
+Only initialized, public, non-static, non-readonly properties whose names do not start with `_` are included in state. Use JSON-compatible scalars, nullable values, and arrays. Do not use public state for services, PHP models, file objects, or secrets. Private/protected properties are recreated each request and are not synchronized.
+
+| Phase | Order |
+| --- | --- |
+| Initial mount | Instantiate → `boot()` → `mount(...$props)` or `fill($props)` → `dehydrate()` → `render()` → serialize state |
+| Update/action | Verify identity → instantiate → check action → `boot()` → restore state → `hydrate()` → apply updates → run action → `dehydrate()` → `render()` → serialize state |
+| Property update | `updatingName($value)` → `updating($property, $value)` → assignment → `updated($property, $value)` → `updatedName($value)` |
+
+`mount()` is optional and runs only on initial mount. Named `$props` become named arguments when `mount()` exists; otherwise they fill matching public properties. `boot()` runs before state restoration, so checks that depend on restored values belong in `hydrate()` or the action itself. Restoring the previous state with `fill()` does not run property-update hooks. `__sync` refreshes without calling an action or a synthetic `updated()` hook.
+
+`fire:model` updates browser state immediately and synchronizes after 250 ms by default. `.debounce.500ms` changes that delay; `.lazy` / `.change` listens to `change`. `fire:model` accepts top-level public property names. Alpine bindings such as `x-model="state.filters.query"` can edit nested arrays represented as objects. Requests are serialized per component, and typing during a request is retained. See the [JS component reference](https://github.com/shahinmoyshan/fireline#reactive-php-components) for controls, loading, polling, and keys.
+
+### Validation and actions
+
+`$this->validate($rules)` uses TinyCore's validator and returns only validated fields. Use it in actions or property-update hooks. On failure it throws `ValidationException`, which the endpoint captures to return HTTP 200 with the error bag and rendered HTML. Update-hook validation failures skip the action while retaining other edits in the same request. Ordinary page/form validation still uses HTTP 422.
+
+Use `$this->addError('label', 'Message')`, `$this->resetErrors()`, or `$this->getErrorBag()`. The bag supports `any()`, `has($field)`, `first($field)`, `get($field)`, `all()`, iteration, counting, and `$errors['label']` for the first message. Errors belong to the current request; revalidate when subsequent requests need to display them.
+
+Only public, non-static action methods can be called remotely. Base component methods, underscore-prefixed methods, `mount`, `view`, and `updating*` / `updated*` hooks are blocked, including case variants. HMAC signatures protect the component class and instance ID; **they do not make public state or action arguments trustworthy**. Validate inputs and authorize access in your actions. Authorization performed only in a page's `mount()` does not protect later requests to the shared component endpoint. Keep application authentication and CSRF protection enabled for that endpoint.
+
+### Events and navigation
+
+```php
+$this->dispatch('label-saved', $this->label);
+$this->navigate('/dashboard'); // FireLine page navigation.
+$this->redirect('/login');     // Full browser navigation.
+```
+
+Dispatch positional parameters. Browser events are sent on `window` with `event.detail.params`; declare `protected array $listeners = ['refresh-counter' => 'refresh'];` to map an event to a public action. Listener mappings are fixed at mount. Events are emitted after an update renders; redirect/navigation responses take precedence. Mount-time events and navigation effects are not delivered by the initial HTML wrapper.
+
+### File uploads and scope
+
+**File uploads are outside the reactive component API.** The browser ignores `fire:model` on file inputs. The component endpoint accepts JSON state and action arguments and does not receive or store uploaded files. Developers should implement their own native upload form or multipart endpoint, including validation, authorization, storage, progress, and cleanup. A resulting application-defined file identifier can be assigned to component state; verify ownership before using it.
+
+There are no temporary-upload objects, automatic model hydration, locked-property attributes, or persistent nested component instances. A child component can remount when its parent returns a new wrapper. Use independently mounted sibling components when their state must remain separate.
+
 ## CSRF and cache behavior
 
-FireLine serializes the form's fields; it does not generate CSRF tokens. Include Spark's `@csrf` hidden field, or set `FireLine.settings.csrfToken` to your server-provided token to send `X-CSRF-TOKEN`. Keep Spark's CSRF middleware enabled for writes. For method overrides, use the framework's hidden `_method` field in a POST form.
+FireLine serializes the form's fields; it does not generate CSRF tokens. Include Spark's `@csrf` hidden field, or set `FireLine.settings.csrfToken` to your server-provided token to send `X-CSRF-TOKEN`. Keep Spark's CSRF middleware enabled for writes. Reactive component requests do not serialize hidden form fields: set `FireLine.settings.csrfToken` or provide a `meta[name="csrf-token"]` element containing your application's token. For method overrides, use the framework's hidden `_method` field in a POST form.
 
 ### Asset Versioning
 
@@ -186,9 +291,12 @@ composer test -- --testsuite Unit
 composer test -- --testsuite Feature
 composer test -- --filter Validation
 composer test -- --list-tests
+composer archive --format=zip --dir=/tmp/fireline-release
 ```
 
-The PHP suite uses TinyCore’s built-in `Spark\Testing\Runner`, `TestCase`, `ApplicationTestCase` and `TestResponse`; no custom assertion runner or extra test dependency is required. Unit tests live in `tests/Unit`, and feature tests in `tests/Feature`. Each feature test gets an isolated application and temporary storage, cleaned up by the framework. The tests exercise helper loading, both render representations, titles (including empty and zero), redirects, sequential requests, asset-version isolation, advanced request headers, validation, cache headers, and actual HTTP dispatch through the provider, router and middleware (including normalized and early responses). The sibling JS repository also provides a real browser/PHP test:
+Release archives include the component generator stubs and exclude tests, installed dependencies, and the local lockfile.
+
+The PHP suite uses TinyCore’s built-in `Spark\Testing\Runner`, `TestCase`, `ApplicationTestCase` and `TestResponse`; no custom assertion runner or extra test dependency is required. Unit tests live in `tests/Unit`, and feature tests in `tests/Feature`. Each feature test gets an isolated application and temporary storage, cleaned up by the framework. The tests exercise component state, actions, signatures, inline validation, command generation, helper loading, both render representations, titles (including empty and zero), redirects, sequential requests, asset-version isolation, advanced request headers, validation, cache headers, and actual HTTP dispatch through the provider, router and middleware (including normalized and early responses). The sibling JS repository also provides a real browser/PHP test:
 
 ```sh
 cd ../fireline-js

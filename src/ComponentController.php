@@ -65,8 +65,16 @@ class ComponentController
         try {
             $component->fill($state);
             $component->hydrate();
+            $errors = [];
             foreach ($updates as $property => $value) {
-                $component->syncProperty((string) $property, $value);
+                try {
+                    $component->syncProperty((string) $property, $value);
+                } catch (ValidationException $exception) {
+                    $errors = [...$errors, ...$exception->getErrors()];
+                }
+            }
+            if ($errors) {
+                $component->setErrors($errors);
             }
         } catch (InvalidArgumentException) {
             return $this->errorResponse('Invalid component state.', 400);

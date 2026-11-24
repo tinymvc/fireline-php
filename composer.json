@@ -15,11 +15,6 @@
             "Tests\\": "tests/"
         }
     },
-    "archive": {
-        "exclude": [
-            "/tests"
-        ]
-    },
     "require": {
         "php": "^8.2",
         "tinymvc/tinycore": "^4.0.7"

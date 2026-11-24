@@ -12,7 +12,7 @@ final class MakeComponentCommandTest extends ApplicationTestCase
 
     protected function createApplication(): \Spark\Foundation\Application
     {
-        return (new \Spark\Foundation\Application(dirname(__DIR__)))->withApp(
+        return (new \Spark\Foundation\Application($this->tempAppDir))->withApp(
             config: [
                 'app' => [
                     'debug' => false,
@@ -27,10 +27,10 @@ final class MakeComponentCommandTest extends ApplicationTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
         $this->tempAppDir = sys_get_temp_dir() . '/fireline_test_' . uniqid();
         mkdir($this->tempAppDir . '/app/Components', 0777, true);
         mkdir($this->tempAppDir . '/resources/views/components', 0777, true);
+        parent::setUp();
     }
 
     protected function tearDown(): void
