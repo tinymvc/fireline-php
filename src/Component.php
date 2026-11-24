@@ -62,9 +62,9 @@ abstract class Component
 
     /**
      * Render the component view.
-     * Can return rendered HTML, a Blade instance, or delegates to view().
+     * Can return rendered HTML, or delegates to view().
      */
-    public function render(): string|Blade
+    public function render(): string
     {
         if (method_exists($this, 'view')) {
             $view = $this->view();

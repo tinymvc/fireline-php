@@ -33,6 +33,12 @@ class FireService
 
     public function component(string $class, array $props = []): string
     {
+        // Normalize the class name to ensure it is fully qualified and starts with the "App" namespace.
+        $class = ltrim($class, '\\');
+        if (!str_starts_with($class, 'App\\') && !class_exists($class)) {
+            $class = 'App\\Components\\' . join('\\', array_map('ucwords', explode('.', $class)));
+        }
+
         if (!ComponentSecurity::isComponentClass($class)) {
             throw new \InvalidArgumentException("Invalid component class: {$class}");
         }
