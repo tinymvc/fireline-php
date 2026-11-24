@@ -22,6 +22,7 @@ use Spark\Http\Response;
  * @method static bool isPartial()
  * @method static ?string assetVersion()
  * @method static FireService version(string $version)
+ * @method static string component(string $class, array $props = [])
  */
 class Fire extends Facade
 {

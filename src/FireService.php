@@ -5,6 +5,7 @@ namespace Spark\Fire;
 use Spark\Http\{Header, Request, Response};
 use Spark\View\Blade;
 use function in_array;
+use function sprintf;
 
 class FireService
 {
@@ -28,6 +29,47 @@ class FireService
     public function assetVersion(): ?string
     {
         return self::$versions[$this->request] ?? null;
+    }
+
+    public function component(string $class, array $props = []): string
+    {
+        if (!ComponentSecurity::isComponentClass($class)) {
+            throw new \InvalidArgumentException("Invalid component class: {$class}");
+        }
+
+        /** @var Component $component */
+        $component = new $class();
+        $id = $component->getId();
+        $component->boot();
+
+        if (method_exists($component, 'mount')) {
+            $component->mount(...$props);
+        } else {
+            $component->fill($props);
+        }
+
+        $component->dehydrate();
+        $html = (string) $component->render();
+        $state = $component->getState();
+        $checksum = ComponentSecurity::sign($id, $class);
+
+        $payload = htmlspecialchars(json_encode([
+            'id' => $id,
+            'component' => $class,
+            'checksum' => $checksum,
+            'state' => (object) $state,
+            'listeners' => (object) $component->getListeners(),
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR), ENT_QUOTES, 'UTF-8');
+
+        $safeId = htmlspecialchars($id, ENT_QUOTES, 'UTF-8');
+
+        return sprintf(
+            '<div id="%s" data-fire-id="%s" x-data="fireComponent(%s)"><div data-fire-content>%s</div></div>',
+            $safeId,
+            $safeId,
+            $payload,
+            $html
+        );
     }
 
     public function render(string $template, array $props = [], ?string $title = null): Response

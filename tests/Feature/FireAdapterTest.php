@@ -156,8 +156,8 @@ final class FireAdapterTest extends ApplicationTestCase
 
     public function testFireRouteDoesNotAcceptPost(): void
     {
-        // Spark treats an unmatched HTTP method as a route-not-found response.
-        $this->postJson('/about')->assertNotFound();
+        // Spark treats an unmatched HTTP method as a method-not-allowed or not-found response.
+        $this->postJson('/about')->assertStatus(\Spark\Http\Response::STATUS_METHOD_NOT_ALLOWED);
     }
     public function testVersionSurvivesFacadeResolutionsButNotTheNextRequest(): void
     {

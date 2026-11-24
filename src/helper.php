@@ -55,6 +55,12 @@ function is_fire_partial(): bool
     return Fire::isPartial();
 }
 
+/** Mount a reactive component with its initial properties. */
+function fire_component(string $component, array $props = []): string
+{
+    return Fire::component($component, $props);
+}
+
 /**
  * Helper function to generate a unique key based on the provided data.
  *

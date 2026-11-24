@@ -1,0 +1,20 @@
+<?php
+
+namespace {{ namespace }};
+
+use Spark\Fire\Component;
+
+class {{ class }} extends Component
+{
+    public int $count = 0;
+
+    protected function view(): string
+    {
+        return '{{ view }}';
+    }
+
+    public function increment(): void
+    {
+        $this->count++;
+    }
+}
